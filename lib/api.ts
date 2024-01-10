@@ -1,17 +1,17 @@
+import type {
+  Asset,
+  AssetCollection,
+  EducationSchoolCollection,
+  InterestsCollection,
+  Maybe,
+  Person,
+  Query,
+  QueryAssetArgs,
+  Skill,
+  SkillFilter,
+} from "@/generated/generated";
+
 const POST_GRAPHQL_FIELDS = `
-  slug
-  title
-  coverImage {
-    url
-  }
-  date
-  author {
-    name
-    picture {
-      url
-    }
-  }
-  excerpt
   content {
     json
     links {
@@ -20,15 +20,19 @@ const POST_GRAPHQL_FIELDS = `
           sys {
             id
           }
-          url
+          title
           description
+          url
+          height
+          width
         }
       }
     }
   }
+  slug
 `;
 
-async function fetchGraphQL(query: string, preview = false): Promise<any> {
+async function fetchGraphQL<T>(query: string, preview = false) {
   return fetch(
     `https://graphql.contentful.com/content/v1/spaces/${process.env.CONTENTFUL_SPACE_ID}`,
     {
@@ -42,79 +46,219 @@ async function fetchGraphQL(query: string, preview = false): Promise<any> {
         }`,
       },
       body: JSON.stringify({ query }),
-      next: { tags: ["posts"] },
     },
-  ).then((response) => response.json());
+  ).then((response) => response.json() as T);
 }
 
-function extractPost(fetchResponse: any): any {
-  return fetchResponse?.data?.postCollection?.items?.[0];
+function extractAsset(fetchResponse: Maybe<{ data?: Query }>) {
+  return fetchResponse?.data?.asset as Asset;
 }
 
-function extractPostEntries(fetchResponse: any): any[] {
-  return fetchResponse?.data?.postCollection?.items;
+function extractAssetEntries(fetchResponse: Maybe<{ data?: Query }>) {
+  return fetchResponse?.data?.assetCollection
+    ?.items as AssetCollection["items"];
 }
 
-export async function getPreviewPostBySlug(slug: string | null): Promise<any> {
-  const entry = await fetchGraphQL(
-    `query {
-      postCollection(where: { slug: "${slug}" }, preview: true, limit: 1) {
-        items {
-          ${POST_GRAPHQL_FIELDS}
-        }
-      }
-    }`,
-    true,
-  );
-  return extractPost(entry);
+function extractEducation(fetchResponse: Maybe<{ data?: Query }>) {
+  return fetchResponse?.data?.educationSchoolCollection
+    ?.items as EducationSchoolCollection["items"];
 }
 
-export async function getAllPosts(isDraftMode: boolean): Promise<any[]> {
-  const entries = await fetchGraphQL(
-    `query {
-      postCollection(where: { slug_exists: true }, order: date_DESC, preview: ${
-        isDraftMode ? "true" : "false"
-      }) {
-        items {
-          ${POST_GRAPHQL_FIELDS}
-        }
-      }
-    }`,
-    isDraftMode,
-  );
-  return extractPostEntries(entries);
+function extractInterests(fetchResponse: Maybe<{ data?: Query }>) {
+  return fetchResponse?.data?.interestsCollection
+    ?.items as InterestsCollection["items"];
 }
 
-export async function getPostAndMorePosts(
-  slug: string,
-  preview: boolean,
-): Promise<any> {
-  const entry = await fetchGraphQL(
-    `query {
-      postCollection(where: { slug: "${slug}" }, preview: ${
-        preview ? "true" : "false"
-      }, limit: 1) {
-        items {
-          ${POST_GRAPHQL_FIELDS}
-        }
-      }
-    }`,
-    preview,
-  );
-  const entries = await fetchGraphQL(
-    `query {
-      postCollection(where: { slug_not_in: "${slug}" }, order: date_DESC, preview: ${
-        preview ? "true" : "false"
-      }, limit: 2) {
-        items {
-          ${POST_GRAPHQL_FIELDS}
-        }
-      }
-    }`,
-    preview,
-  );
+function extractSkill(fetchResponse: Maybe<{ data?: Query }>) {
+  return fetchResponse?.data?.skillCollection?.items[0] as Skill;
+}
+
+function extractProfilePic(fetchResponse: Maybe<{ data?: Query }>) {
+  return fetchResponse?.data?.personCollection?.items[0] as Person;
+}
+
+function extractHomePage(fetchResponse: Maybe<{ data?: Query }>) {
+  const {
+    educationSchoolCollection,
+    experienceCompanyCollection,
+    interestsCollection,
+    personCollection,
+    skillCollection,
+  } = (fetchResponse?.data as Query) ?? {};
+
   return {
-    post: extractPost(entry),
-    morePosts: extractPostEntries(entries),
+    education: educationSchoolCollection?.items,
+    experience: experienceCompanyCollection?.items,
+    interests: interestsCollection?.items,
+    person: personCollection?.items[0],
+    skills: skillCollection?.items,
   };
 }
+
+export const getAllAssetsWithSlug = async () => {
+  const entries = await fetchGraphQL<{ data?: Query }>(
+    `query {
+      assetCollection(where: { slug_exists: true }, order: date_DESC) {
+        items {
+          title
+          description
+          contentType
+          fileName
+          size
+          url
+          width
+          height
+        }
+      }
+    }`,
+  );
+
+  return extractAssetEntries(entries);
+};
+
+export const getAsset = async (assetId: QueryAssetArgs["id"]) => {
+  const entry = await fetchGraphQL<{ data?: Query }>(
+    `query {
+      asset(id: "${assetId}") {
+        title
+        description
+        contentType
+        fileName
+        size
+        url
+        width
+        height
+      }
+    }`,
+  );
+
+  return extractAsset(entry);
+};
+
+export const getSkillBySlug = async (slug: SkillFilter["slug"]) => {
+  const entry = await fetchGraphQL<{ data?: Query }>(
+    `query {
+      skillCollection(where: { slug: "${slug}" }, limit: 1) {
+        items {
+          skillName
+          rating
+          sys {
+            id
+          }
+          ${POST_GRAPHQL_FIELDS}
+        }
+      }
+    }`,
+  );
+
+  return extractSkill(entry);
+};
+
+export const getEducation = async () => {
+  const entry = await fetchGraphQL<{ data?: Query }>(
+    `query {
+      educationSchoolCollection {
+        items {
+          schoolName
+          description {
+            json
+          }
+          startDate
+          endDate
+        }
+      }
+    }`,
+  );
+
+  return extractEducation(entry);
+};
+
+export const getInterests = async () => {
+  const entry = await fetchGraphQL<{ data?: Query }>(
+    `query {
+      interestsCollection {
+        items {
+          interest
+        }
+      }
+    }`,
+  );
+
+  return extractInterests(entry);
+};
+
+export const getProfilePic = async () => {
+  const entry = await fetchGraphQL<{ data?: Query }>(
+    `query {
+      personCollection {
+        items {
+          image {
+            height
+            width
+            description
+            url
+          }
+        }
+      }
+    }`,
+  );
+
+  return extractProfilePic(entry);
+};
+
+export const getHomePageQuery = async () => {
+  const entry = await fetchGraphQL<{ data?: Query }>(
+    `query {
+      personCollection {
+        items {
+          firstName
+          lastName
+          title
+          shortBio
+          email
+          phone
+          github
+          codesandbox
+        }
+      }
+      educationSchoolCollection {
+        items {
+          schoolName
+          description {
+            json
+          }
+          startDate
+          endDate
+        }
+      }
+      experienceCompanyCollection(order: endDateTime_DESC) {
+        items {
+          companyName
+          city
+          description {
+            json
+          }
+          startDate
+          endDate
+        }
+      }
+      skillCollection(order: order_ASC) {
+        items {
+          skillName
+          slug
+          icon {
+            description
+            url
+          }
+        }
+      }
+      interestsCollection {
+        items {
+          interest
+        }
+      }
+    }`,
+  );
+
+  return extractHomePage(entry);
+};
