@@ -1,14 +1,7 @@
-import Link from "next/link";
-import { draftMode } from "next/headers";
-
-import Date from "./date";
-import CoverImage from "./cover-image";
-import Avatar from "./avatar";
-import MoreStories from "./more-stories";
-
 import Divisor from "@/components/divisor";
-import { getAllPosts } from "@/lib/api";
+import { getHomePageQuery } from "@/lib/api";
 import { CMS_NAME, CMS_URL } from "@/lib/constants";
+import Interests from "@/components/sections/interests";
 
 function Intro() {
   return (
@@ -37,57 +30,17 @@ function Intro() {
   );
 }
 
-function HeroPost({
-  title,
-  coverImage,
-  date,
-  excerpt,
-  author,
-  slug,
-}: {
-  title: string;
-  coverImage: any;
-  date: string;
-  excerpt: string;
-  author: any;
-  slug: string;
-}) {
-  return (
-    <section>
-      <div className="mb-8 md:mb-16">
-        <CoverImage title={title} slug={slug} url={coverImage.url} />
-      </div>
-      <div className="mb-20 md:mb-28 md:grid md:grid-cols-2 md:gap-x-16 lg:gap-x-8">
-        <div>
-          <h3 className="mb-4 text-4xl leading-tight lg:text-6xl">
-            <Link href={`/posts/${slug}`} className="hover:underline">
-              {title}
-            </Link>
-          </h3>
-          <div className="mb-4 text-lg md:mb-0">
-            <Date dateString={date} />
-          </div>
-        </div>
-        <div>
-          <p className="mb-4 text-lg leading-relaxed">{excerpt}</p>
-          {author && <Avatar name={author.name} picture={author.picture} />}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export default async function Page() {
-  const { isEnabled } = draftMode();
-  const allPosts = (await getAllPosts(isEnabled)) ?? [];
-  const heroPost = allPosts[0];
-  const morePosts = allPosts.slice(1);
+  const home = await getHomePageQuery();
+
+  const interests = home.interests;
 
   return (
     <div className="container mx-auto px-5">
-      <Divisor />
       <Intro />
-      {heroPost && (
+      <Divisor />
+      <Interests interests={interests} />
+      {/* {heroPost && (
         <HeroPost
           title={heroPost.title}
           coverImage={heroPost.coverImage}
@@ -95,9 +48,9 @@ export default async function Page() {
           author={heroPost.author}
           slug={heroPost.slug}
           excerpt={heroPost.excerpt}
-        />
-      )}
-      <MoreStories morePosts={morePosts} />
+        /> }
+      ) */}
+      {/* <MoreStories morePosts={morePosts} /> */}
     </div>
   );
 }
